@@ -20,13 +20,18 @@ type nginx struct {
 	provisioner    *KopsProvisioner
 	kops           *kops.Cmd
 	logger         log.FieldLogger
+	cluster        *model.Cluster
 	desiredVersion string
 	actualVersion  string
 }
 
-func newNginxHandle(desiredVersion string, provisioner *KopsProvisioner, awsClient aws.AWS, kops *kops.Cmd, logger log.FieldLogger) (*nginx, error) {
+func newNginxHandle(desiredVersion string, cluster *model.Cluster, provisioner *KopsProvisioner, awsClient aws.AWS, kops *kops.Cmd, logger log.FieldLogger) (*nginx, error) {
 	if logger == nil {
 		return nil, errors.New("cannot instantiate NGINX handle with nil logger")
+	}
+
+	if cluster == nil {
+		return nil, errors.New("cannot create a connection to Nginx if the cluster provided is nil")
 	}
 
 	if provisioner == nil {
@@ -45,6 +50,7 @@ func newNginxHandle(desiredVersion string, provisioner *KopsProvisioner, awsClie
 		awsClient:      awsClient,
 		provisioner:    provisioner,
 		kops:           kops,
+		cluster:        cluster,
 		logger:         logger.WithField("cluster-utility", model.NginxCanonicalName),
 		desiredVersion: desiredVersion,
 	}, nil
@@ -98,21 +104,23 @@ func (n *nginx) NewHelmDeployment() (*helmDeployment, error) {
 		return nil, errors.Wrap(err, "failed to retrive the AWS ACM")
 	}
 
-	awsACMPrivateCert, err := n.awsClient.GetCertificateSummaryByTag(aws.DefaultInstallPrivateCertificatesTagKey, aws.DefaultInstallPrivateCertificatesTagValue, n.logger)
+	clusterResources, err := n.awsClient.GetVpcResources(n.cluster.ID, n.logger)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to retrive the AWS Private ACM")
+		return nil, errors.Wrap(err, "failed to retrive the VPC information")
 	}
 
 	return &helmDeployment{
 		chartDeploymentName: "nginx",
 		chartName:           "ingress-nginx/ingress-nginx",
 		namespace:           "nginx",
-		setArgument:         fmt.Sprintf("controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-cert=%s,controller.service.internal.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-cert=%s", *awsACMCert.CertificateArn, *awsACMPrivateCert.CertificateArn),
 		valuesPath:          "helm-charts/nginx_values.yaml",
-		kopsProvisioner:     n.provisioner,
-		kops:                n.kops,
-		logger:              n.logger,
+		setArgument:         fmt.Sprintf("controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-cert=%s,controller.config.proxy-real-ip-cidr=%s", *awsACMCert.CertificateArn, clusterResources.VpcCIDR),
 		desiredVersion:      n.desiredVersion,
+
+		cluster:         n.cluster,
+		kopsProvisioner: n.provisioner,
+		kops:            n.kops,
+		logger:          n.logger,
 	}, nil
 }
 

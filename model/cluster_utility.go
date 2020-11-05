@@ -16,6 +16,8 @@ const (
 	ThanosCanonicalName = "thanos"
 	// NginxCanonicalName is the canonical string representation of nginx
 	NginxCanonicalName = "nginx"
+	// NginxInternalCanonicalName is the canonical string representation of nginx internal
+	NginxInternalCanonicalName = "nginx-internal"
 	// FluentbitCanonicalName is the canonical string representation of fluentbit
 	FluentbitCanonicalName = "fluentbit"
 	// TeleportCanonicalName is the canonical string representation of teleport
@@ -46,6 +48,7 @@ type utilityVersions struct {
 	PrometheusOperator string
 	Thanos             string
 	Nginx              string
+	NginxInternal      string
 	Fluentbit          string
 	Teleport           string
 }
@@ -154,6 +157,8 @@ func getUtilityVersion(versions *utilityVersions, utility string) string {
 		return versions.Thanos
 	case NginxCanonicalName:
 		return versions.Nginx
+	case NginxInternalCanonicalName:
+		return versions.NginxInternal
 	case FluentbitCanonicalName:
 		return versions.Fluentbit
 	case TeleportCanonicalName:
@@ -175,6 +180,8 @@ func setUtilityVersion(versions *utilityVersions, utility, desiredVersion string
 		versions.Thanos = desiredVersion
 	case NginxCanonicalName:
 		versions.Nginx = desiredVersion
+	case NginxInternalCanonicalName:
+		versions.NginxInternal = desiredVersion
 	case FluentbitCanonicalName:
 		versions.Fluentbit = desiredVersion
 	case TeleportCanonicalName:
